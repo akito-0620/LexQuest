@@ -1,0 +1,177 @@
+// LexQuest — Vocabulary Encyclopedia RPG
+// SQLite for MVP; models mirror LexQuest_design_spec.md §14.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  displayName String
+  playerLevel Int      @default(1)
+  playerXp    Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  sessions        Session[]
+  userVocabulary  UserVocabulary[]
+  vocabularyUsage VocabularyUsage[]
+  userQuests      UserQuest[]
+}
+
+model Scenario {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  name          String
+  description   String
+  goal          String
+  // JSON-encoded: string[] of recommended conversation function slugs
+  focusFunctions String  @default("[]")
+  // JSON-encoded: number[] of quest IDs (by slug) recommended for this scenario
+  recommendedQuestSlugs String @default("[]")
+  openingLine   String
+  createdAt     DateTime @default(now())
+
+  sessions Session[]
+}
+
+model Session {
+  id          String   @id @default(cuid())
+  userId      String
+  scenarioId  String
+  startedAt   DateTime @default(now())
+  endedAt     DateTime?
+  totalTurns  Int      @default(0)
+  summaryJson String?  // serialised SessionSummary
+
+  user     User      @relation(fields: [userId], references: [id])
+  scenario Scenario  @relation(fields: [scenarioId], references: [id])
+  messages Message[]
+  usages   VocabularyUsage[]
+  survey   SurveyResponse?
+  quests   SessionQuest[]
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  sessionId String
+  role      String   // "user" | "assistant" | "system"
+  content   String
+  createdAt DateTime @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id])
+  usages  VocabularyUsage[]
+}
+
+model VocabularyItem {
+  id             String   @id @default(cuid())
+  normalizedText String   @unique
+  displayText    String
+  category       String   // "word" | "expression" | "phrase" | "function"
+  meaningGroup   String?  // synonym group key e.g. "like"
+  functionType   String?  // for category=function, the function slug e.g. "back_channel"
+  alternatives   String   @default("[]") // JSON string[]
+  createdAt      DateTime @default(now())
+
+  userVocabulary UserVocabulary[]
+  usages         VocabularyUsage[]
+}
+
+model UserVocabulary {
+  id               String   @id @default(cuid())
+  userId           String
+  vocabularyItemId String
+  level            Int      @default(1)
+  xp               Int      @default(0)
+  totalCount       Int      @default(0)
+  firstUsedAt      DateTime @default(now())
+  lastUsedAt       DateTime @default(now())
+  status           String   @default("new") // new | growing | stable | overused
+  discoveredFromAi Boolean  @default(false)
+
+  user           User           @relation(fields: [userId], references: [id])
+  vocabularyItem VocabularyItem @relation(fields: [vocabularyItemId], references: [id])
+
+  @@unique([userId, vocabularyItemId])
+}
+
+model VocabularyUsage {
+  id               String   @id @default(cuid())
+  sessionId        String
+  userId           String
+  vocabularyItemId String
+  messageId        String
+  xpAwarded        Int
+  isNew            Boolean  @default(false)
+  leveledUp        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  session        Session        @relation(fields: [sessionId], references: [id])
+  user           User           @relation(fields: [userId], references: [id])
+  vocabularyItem VocabularyItem @relation(fields: [vocabularyItemId], references: [id])
+  message        Message        @relation(fields: [messageId], references: [id])
+}
+
+model Quest {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  type        String   // "new" | "variation" | "function" | "continuation"
+  title       String
+  description String
+  targetJson  String   @default("{}") // JSON criteria (e.g. { "function": "back_channel", "count": 1 })
+  rewardXp    Int      @default(20)
+  active      Boolean  @default(true)
+
+  userQuests    UserQuest[]
+  sessionQuests SessionQuest[]
+}
+
+model UserQuest {
+  id          String   @id @default(cuid())
+  userId      String
+  questId     String
+  status      String   @default("active") // active | completed | archived
+  progress    Int      @default(0)
+  streak      Int      @default(0)
+  completedAt DateTime?
+
+  user  User  @relation(fields: [userId], references: [id])
+  quest Quest @relation(fields: [questId], references: [id])
+}
+
+model SessionQuest {
+  id        String   @id @default(cuid())
+  sessionId String
+  questId   String
+  status    String   @default("active") // active | completed
+  progress  Int      @default(0)
+
+  session Session @relation(fields: [sessionId], references: [id])
+  quest   Quest   @relation(fields: [questId], references: [id])
+
+  @@unique([sessionId, questId])
+}
+
+model SurveyResponse {
+  id          String   @id @default(cuid())
+  sessionId   String   @unique
+  ease        Int
+  agency      Int
+  motivation  Int
+  confidence  Int
+  reuseIntent Int
+  freeComment String?
+  createdAt   DateTime @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id])
+}
+
+model AppSettings {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

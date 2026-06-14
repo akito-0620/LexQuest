@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(npm install *)",
+      "Bash(npx prisma *)",
+      "Bash(npx tsx *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(curl *)",
+      "Bash(tasklist)",
+      "Bash(python *)",
+      "Bash(taskkill //F //PID 9328 //PID 25308 //PID 7408)",
+      "Bash(taskkill //F //PID 25712 //PID 17696 //PID 6608)"
+    ]
+  }
+}
